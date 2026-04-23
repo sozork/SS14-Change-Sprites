@@ -4,7 +4,39 @@ import os
 import base64
 import customtkinter as ctk
 from PIL import Image
+import pandas as pd
+import requests
 import io
+# проверка новизны базы запретов
+# types
+#c - if blocked path or blocked data inside of path or data
+#i - if blocked path == path or blocked data == data
+not_allowed_path = [] # (path, type)
+not_allowed_data = [] # (data, type)
+git_path = "https://github.com/sozork/banned-sprites-database/raw/refs/heads/main/database.db"
+try:
+    response = requests.get(git_path)
+except:
+    print("Bans Database not reachable")
+    quit()
+if response.status_code == 200:
+    db_bytes = response.content
+    connection = sqlite3.connect(":memory:")
+    connection.deserialize(db_bytes)
+    cursor = connection.cursor()
+    data = cursor.execute("SELECT * FROM 'banned sprites'").fetchall()
+    # проход по каждой строке в бд и запись данных в списки
+    for row in data:
+        bandata = row[0]
+        banpath = row[1]
+        datatype = row[2] # не тоже самое что .png .db и тд. Это то как данные использовать
+        if bandata != None:
+            not_allowed_data.append((bandata, datatype))
+        if banpath != None:
+            not_allowed_path.append((banpath, datatype))
+else:   
+    print("Failed to fetch database from github")
+    quit()
 # sql запросы для ну что бы обойти ограничение на размер файлов(файл нельзя сменить т.к его размер не совпадает)
 remove_check = '''
 PRAGMA foreign_keys = false;
@@ -45,13 +77,27 @@ PRAGMA foreign_keys = true;'''
 
 
 # cursor.executescript((remove_check))
-# СЮДА НУЖНО ПРОВЕРКУ НА БАЗУ ДАННЫХ ИЗВНЕ
-not_allowed_path = ['lurker', 'scout']
-dont_show_path = []
 # --------------------------
 
 content_path = ''   # то где находится твоя база данных, не путать с путём до самого спрайта
-
+# проверка на запреты
+def check_is_valid(path, data):
+    global banpath, bandata
+    for bandata in not_allowed_data:
+        if bandata[1] == 'c':
+            if bandata[0] in data:
+                return False
+        elif bandata[1] == 'i':
+            if bandata[0] == data:
+                return False
+    for banpath in not_allowed_path:
+        if banpath[1] == 'c':
+            if banpath[0].lower() in path.lower():
+                return False
+        elif banpath[1] == 'i':
+            if banpath[0].lower() == path.lower():
+                return False
+    return True
 # Вставить с заменой файлы в баззу данных , берёт ид, путь до спрайта на который меняет
 def set_db_data(content_path, content_id, image_path):
     connection = sqlite3.connect(content_path)
@@ -106,7 +152,10 @@ def get_display_sprites(content_path, search_param):
 
         if compression != 0:
             data = compress_decompress.decompress(data)
-        pairs.append((i[0], instance_path, data, compression))
+        
+        # проверка на запреты
+        if check_is_valid(instance_path, data):
+            pairs.append((i[0], instance_path, data, compression))
     
     return pairs
         
@@ -122,7 +171,7 @@ class StartPage(ctk.CTkFrame):
         self.backups_btn.grid(column = 1, row = 0)
         self.packs_btn = ctk.CTkButton(self, text='Packs')
         self.packs_btn.grid(column = 2, row = 0)
-    
+
 # Фрейм смены спрайтов
 class ChangesprPage(ctk.CTkFrame):
     def __init__(self, master, griddata):
