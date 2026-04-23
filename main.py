@@ -52,11 +52,9 @@ dont_show_path = []
 content_path = ''   # то где находится твоя база данных, не путать с путём до самого спрайта
 
 # Вставить с заменой файлы в баззу данных , берёт ид, путь до спрайта на который меняет
-def set_db_data(content_path, path, image_path):
+def set_db_data(content_path, content_id, image_path):
     connection = sqlite3.connect(content_path)
     cursor = connection.cursor() #  UPDATE Content SET Data = data_var WHERE Id = content_id
-    content_id = cursor.execute('SELECT ContentId FROM ContentManifest WHERE path LIKE ?', [path])
-    content_id = content_id.fetchone()[0]
     compression = cursor.execute(("SELECT compression FROM Content WHERE id = "+str(content_id)))
     compression = compression.fetchone()[0]
     imagpath = cursor.execute("SELECT path FROM ContentManifest WHERE ContentId = "+str(content_id)).fetchone()[0]
@@ -134,53 +132,80 @@ class ChangesprPage(ctk.CTkFrame):
         super().__init__(master)
         # хэсшмап для пути до бд и пути до спрайта на который меняют
         self.dict = {"content_path":"", "change_image_to_path": ""}
+        # какие спрайты смотрим
+        self.spriteslocation = 0
+        self.spritedelta = 20
+        self.pairs = []
         # свойства грида где он будет
         self.griddata = griddata 
         # кнопочка для выбора пути до контента
         self.contentpath_btn = ctk.CTkButton(self, text='Content, path', command = lambda:self.get_file("content_path", [('DB', '*.db')])) # лямбду нужно ставить что бы функция не вызывалась при запуске
-        self.contentpath_btn.grid(column = 0)
+        self.contentpath_btn.grid(column = 0, row = 0, columnspan=2)
 
-        # кнопочка выбора пути до картинки для смены
-        self.changeimgpath_btn = ctk.CTkButton(self, text='Image to change to, path', command = lambda:self.get_file("change_image_to_path", [("PNG","*.png"),("JPG","*.jpg"),("JPEG","*.jpeg")]))
-        self.changeimgpath_btn.grid(column = 1, row = 0)
-
+        # создаём фрейм чисто для спрайтов
+        self.imageframe = ctk.CTkScrollableFrame(master=self, width=800, height=600)
+        self.imageframe.grid(column = 0, row = 3, columnspan = 2)
+        # кнопки для смены списка
+        self.moveup_btn = ctk.CTkButton(self, text='+', command = lambda:self.change_spriteslocation("+"))
+        self.moveup_btn.grid(column = 0, row = 4)
+        self.movedown_btn = ctk.CTkButton(self, text='-', command = lambda:self.change_spriteslocation("-"))
+        self.movedown_btn.grid(column = 1, row = 4)
+        # путь до спрайта
+        self.spritepath = ctk.CTkLabel(self, text='')
+        self.spritepath.grid(column = 0, row = 5, columnspan = 2)
         # создания ввод парамтров поиска
         self.entry = ctk.CTkEntry(master=self, width=400, height=50)
         self.entry.grid(row=1, column=0, columnspan = 2)
-        self.entry.bind("<Return>", self.show_sprites)
-
+        self.entry.bind("<Return>", command=lambda e:(self.show_on_enter(e, 0, self.spritedelta)))
+    # показ при нажатии на ентер
+    def show_on_enter(self, e, startx, endx):
+        self.pairs = get_display_sprites(self.dict["content_path"], self.entry.get()) # data = image
+        print("pairs retrived, starting showing proccess")
+        self.show_sprites(e, startx, endx)
+    #  удаление виджетов в фрейме
+    def clear_frame(e, frame):
+        for widget in frame.winfo_children():
+            widget.destroy()
+    # смена self.spriteslocation
+    def change_spriteslocation(self, n):
+        if n == "+":
+            self.spriteslocation += self.spritedelta
+        else:
+            self.spriteslocation -= self.spritedelta
+        self.clear_frame(self.imageframe)
+        self.show_sprites(None, self.spriteslocation, self.spriteslocation+self.spritedelta)
     # получаем файлы(фото для смены и путь до контента)
     def get_file(self, key, filetypes):
         self.dict[key] = ctk.filedialog.askopenfilename(filetypes=filetypes)
-
+    # смена текста пути спрайтов
+    def change_spt_path_text(self, e, path):
+        self.spritepath.configure(text=path)
+    # смена спрайтов при нажатиит на кнопку
+    def change_spr(self, content_id):
+        img_file = self.get_file("change_image_to_path", [("PNG","*.png"),("JPG","*.jpg"),("JPEG","*.jpeg")])
+        if img_file != None:
+            set_db_data(self.dict["content_path"], content_id, img_file)
     # Показ спрайтов
-    def show_sprites(self, e):
-        # создаём фрейм чисто для спрайтов
-        self.imageframe = ctk.CTkScrollableFrame(master=self, width=400)
-        self.imageframe.grid(column = 0, row = 3, columnspan = 2)
+    def show_sprites(self, e, startx, endx):
         if self.dict["content_path"] == "":
             pass
         else:
-            pairs = get_display_sprites(self.dict["content_path"], self.entry.get())
-            print("pairs retrived, starting showing proccess")
+            imagesize = (self.contentpath_btn.cget("width"), self.contentpath_btn.cget("width"))
+            pairs = self.pairs[startx:endx]
             n = len(pairs)
-            lenx = 2
-            leny = n//2
-            print(n, lenx, leny)
+            lenx = self.imageframe.winfo_width()//imagesize[0]
+            leny = n//lenx
             for row in range(leny):
                 for column in range(lenx):
-                    if not row*leny + column < n:
+                    if not row*lenx + column < n:
                         break
                     else:
-                        print('niguuuuur')
-                        pair = pairs[row*leny + column]
-                        print(row, column)
+                        pair = pairs[row*lenx + column]
                         content_id, path, data, compression = pair[0], pair[1], pair[2], pair[3]
                         image = Image.open(io.BytesIO(data)) 
-                        self.imageframe.img_btn = ctk.CTkButton(self.imageframe, image=ctk.CTkImage(light_image=image, dark_image=image, size=(self.contentpath_btn.cget("width"), self.contentpath_btn.cget("width"))), text = "")
+                        self.imageframe.img_btn = ctk.CTkButton(self.imageframe, image=ctk.CTkImage(light_image=image, dark_image=image, size=imagesize), text = "", fg_color='transparent', command= lambda content_id = content_id:self.change_spr(content_id))
+                        self.imageframe.img_btn.bind('<Enter>', lambda e, x=path:(self.change_spt_path_text(e, x)), add='+')
                         self.imageframe.img_btn.grid(row = row+1, column = column+1)
-            
-
             pass
 
 # само приложение
