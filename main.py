@@ -7,6 +7,7 @@ from PIL import Image
 import pandas as pd
 import requests
 import io
+import pyperclip
 # проверка новизны базы запретов
 # types
 #c - if blocked path or blocked data inside of path or data
@@ -156,7 +157,6 @@ def get_display_sprites(content_path, search_param):
         # проверка на запреты
         if check_is_valid(instance_path, data):
             pairs.append((i[0], instance_path, data, compression))
-    
     return pairs
         
 # Разные фреймы
@@ -171,7 +171,6 @@ class StartPage(ctk.CTkFrame):
         self.backups_btn.grid(column = 1, row = 0)
         self.packs_btn = ctk.CTkButton(self, text='Packs')
         self.packs_btn.grid(column = 2, row = 0)
-
 # Фрейм смены спрайтов
 class ChangesprPage(ctk.CTkFrame):
     def __init__(self, master, griddata):
@@ -221,9 +220,9 @@ class ChangesprPage(ctk.CTkFrame):
             widget.destroy()
     # смена self.spriteslocation
     def change_spriteslocation(self, n):
-        if n == "+":
+        if n == "+" and self.spriteslocation < len(self.pairs)-self.spritedelta:
             self.spriteslocation += self.spritedelta
-        else:
+        elif self.spriteslocation - self.spritedelta >= 0:
             self.spriteslocation -= self.spritedelta
         self.clear_frame(self.imageframe)
         self.show_sprites(None, self.spriteslocation, self.spriteslocation+self.spritedelta)
@@ -234,8 +233,8 @@ class ChangesprPage(ctk.CTkFrame):
     def change_spt_path_text(self, e, path):
         self.spritepath.configure(text=path)
     # смена или скачивание спрайтов при нажатиит на кнопку
-    def change_spr(self, content_id, compression):
-        msg = CTkMessagebox(title="", message="Download or Change?", icon="question", option_2="Download", option_1="Change")
+    def change_spr(self, content_id, path, compression):
+        msg = CTkMessagebox(title="", message="Download or Change?", icon="question", option_3="Download", option_2="Change", option_1="Copy path to clipboard")
         response = msg.get()
         if response == "Change":
             self.get_file("change_image_to_path", [("PNG","*.png"),("JPG","*.jpg"),("JPEG","*.jpeg")])
@@ -245,6 +244,9 @@ class ChangesprPage(ctk.CTkFrame):
                 set_db_data(self.dict["content_path"], content_id, img_file)
         elif response == "Download":
             save_current_image(self.dict["content_path"], content_id, compression)
+        elif response == "Copy path to clipboard":
+            pyperclip.copy(path)
+            CTkMessagebox(title="Done!", message="Path is copied")
     # Показ спрайтов
     def show_sprites(self, e, startx, endx):
         if self.dict["content_path"] == "":
@@ -254,7 +256,7 @@ class ChangesprPage(ctk.CTkFrame):
             pairs = self.pairs[startx:endx]
             n = len(pairs)
             lenx = self.imageframe.winfo_width()//imagesize[0]
-            leny = n//lenx
+            leny = n//lenx+1
             for row in range(leny):
                 for column in range(lenx):
                     if not row*lenx + column < n:
@@ -263,7 +265,7 @@ class ChangesprPage(ctk.CTkFrame):
                         pair = pairs[row*lenx + column]
                         content_id, path, data, compression = pair[0], pair[1], pair[2], pair[3]
                         image = Image.open(io.BytesIO(data)) 
-                        self.imageframe.img_btn = ctk.CTkButton(self.imageframe, image=ctk.CTkImage(light_image=image, dark_image=image, size=imagesize), text = "", fg_color='transparent', command= lambda content_id = content_id:self.change_spr(content_id, compression))
+                        self.imageframe.img_btn = ctk.CTkButton(self.imageframe, image=ctk.CTkImage(light_image=image, dark_image=image, size=imagesize), text = "", fg_color='transparent', command= lambda content_id = content_id, path = path:self.change_spr(content_id, path, compression))
                         self.imageframe.img_btn.bind('<Enter>', lambda e, x=path:(self.change_spt_path_text(e, x)), add='+')
                         self.imageframe.img_btn.grid(row = row+1, column = column+1)
             pass
@@ -284,7 +286,11 @@ class App(ctk.CTk):
 
         self.startframe = StartPage(self) # иницилизируем стартовый фрейм (всегда ставить последним, т.к в нём используются другие фреймы)
         self.startframe.grid(row=0, column=0) # align в центре
-
+        # текст в углу
+        self.gitlink = ctk.CTkEntry(self,fg_color="transparent", width=500, border_width=0, font=(ctk.CTkFont, 15))
+        self.gitlink.insert(0, 'https://github.com/sozork/SS14-Change-Sprites-customtkinter-rewrite')
+        self.gitlink.configure(state='readonly')
+        self.gitlink.grid(sticky="sw")
 # запуск 
 if __name__ == "__main__":
     app = App()
