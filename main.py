@@ -15,10 +15,10 @@ import pyperclip
 not_allowed_path = [] # (path, type)
 not_allowed_data = [] # (data, type)
 git_path = "https://github.com/sozork/banned-sprites-database/raw/refs/heads/main/database.db"
+ctk.set_appearance_mode('dark')
 try:
     response = requests.get(git_path)
 except:
-    print("Bans Database not reachable")
     quit()
 if response.status_code == 200:
     db_bytes = response.content
@@ -36,7 +36,6 @@ if response.status_code == 200:
         if banpath != None:
             not_allowed_path.append((banpath, datatype))
 else:   
-    print("Failed to fetch database from github")
     quit()
 # sql запросы для ну что бы обойти ограничение на размер файлов(файл нельзя сменить т.к его размер не совпадает)
 remove_check = '''
@@ -116,7 +115,6 @@ def set_db_data(content_path, content_id, image_path):
     cursor.execute("UPDATE Content SET Size = '"+ str(size) +"' WHERE Id = "+str(content_id))
     connection.commit()
     connection.close()
-    print("done!")
 # сохрание по пути до спрайта
 def save_current_image(content_path, content_id, compression):
     connection = sqlite3.connect(content_path)
@@ -127,7 +125,6 @@ def save_current_image(content_path, content_id, compression):
 
     if compression != 0:
         data = compress_decompress.decompress(data)
-    print(content_id, compression)
     imgpath = ctk.filedialog.asksaveasfilename(filetypes=[("PNG","*.png"),("JPG","*.jpg"),("JPEG","*.jpeg")], defaultextension='.png')
     with open(imgpath, 'wb') as f:
         f.write(data)
@@ -212,7 +209,6 @@ class ChangesprPage(ctk.CTkFrame):
         self.spriteslocation = 0
         self.pairs = get_display_sprites(self.dict["content_path"], self.entry.get()) # data = image
         self.clear_frame(self.imageframe)
-        print("pairs retrived, starting showing proccess")
         self.show_sprites(e, startx, endx)
     #  удаление виджетов в фрейме
     def clear_frame(e, frame):
@@ -239,7 +235,6 @@ class ChangesprPage(ctk.CTkFrame):
         if response == "Change":
             self.get_file("change_image_to_path", [("PNG","*.png"),("JPG","*.jpg"),("JPEG","*.jpeg")])
             img_file = self.dict["change_image_to_path"]
-            print(img_file)
             if img_file != None and img_file != '':
                 set_db_data(self.dict["content_path"], content_id, img_file)
         elif response == "Download":
