@@ -1,4 +1,5 @@
 import compress_decompress, sqlite3
+from CTkMessagebox import CTkMessagebox
 import os
 import base64
 import customtkinter as ctk
@@ -68,23 +69,20 @@ def set_db_data(content_path, content_id, image_path):
     cursor.execute("UPDATE Content SET Size = '"+ str(size) +"' WHERE Id = "+str(content_id))
     connection.commit()
     connection.close()
+    print("done!")
 # сохрание по пути до спрайта
-def save_current_image(content_path, path):
+def save_current_image(content_path, content_id, compression):
     connection = sqlite3.connect(content_path)
     cursor = connection.cursor()
-
-    content_id = cursor.execute('SELECT ContentId FROM ContentManifest WHERE path LIKE ?', [path])
-    content_id = content_id.fetchone()[0]
-    compression = cursor.execute(("SELECT compression FROM Content WHERE id = "+str(content_id)))
-    compression = compression.fetchone()[0]
 
     data = cursor.execute("SELECT data FROM Content WHERE id="+str(content_id))
     data = data.fetchone()[0]
 
     if compression != 0:
         data = compress_decompress.decompress(data)
-
-    with open(os.getcwd()+"/downloaded images/"+str(len(os.listdir(os.getcwd()+"/downloaded images/")))+".png", 'wb') as f:
+    print(content_id, compression)
+    imgpath = ctk.filedialog.asksaveasfilename(filetypes=[("PNG","*.png"),("JPG","*.jpg"),("JPEG","*.jpeg")], defaultextension='.png')
+    with open(imgpath, 'wb') as f:
         f.write(data)
 
 # Выдаёт список из bool(ид внутри бд, пути, данные из бд и степени сжатия)
@@ -98,9 +96,8 @@ def get_display_sprites(content_path, search_param):
     content_id = content_id.fetchall()
     content_id = list(set(content_id))
     for i in content_id:
-        compression = cursor.execute("SELECT compression FROM Content WHERE id="+str(i[0]))
+        compression = cursor.execute(("SELECT compression FROM Content WHERE id = "+str(str(i[0]))))
         compression = compression.fetchone()[0]
-
         data = cursor.execute("SELECT data FROM Content WHERE id="+str(i[0]))
         data = data.fetchone()[0]
         
@@ -140,26 +137,33 @@ class ChangesprPage(ctk.CTkFrame):
         self.griddata = griddata 
         # кнопочка для выбора пути до контента
         self.contentpath_btn = ctk.CTkButton(self, text='Content, path', command = lambda:self.get_file("content_path", [('DB', '*.db')])) # лямбду нужно ставить что бы функция не вызывалась при запуске
-        self.contentpath_btn.grid(column = 0, row = 0, columnspan=2)
-
+        self.contentpath_btn.grid(column = 0, row = 0)
+        # sqlite3.connect(content_path).cursor().executescript((remove_check))
+        # кнопки для удаления и добавления констрейна
+        self.removecheck_btn = ctk.CTkButton(self, text='remove check', command = lambda:sqlite3.connect(self.dict["content_path"]).cursor().executescript((remove_check))) # лямбду нужно ставить что бы функция не вызывалась при запуске
+        self.removecheck_btn.grid(column = 1, row = 0)
+        self.addcheck_btn = ctk.CTkButton(self, text='add check', command = lambda:sqlite3.connect(self.dict["content_path"]).cursor().executescript((add_check))) # лямбду нужно ставить что бы функция не вызывалась при запуске
+        self.addcheck_btn.grid(column = 2, row = 0)
         # создаём фрейм чисто для спрайтов
         self.imageframe = ctk.CTkScrollableFrame(master=self, width=800, height=600)
-        self.imageframe.grid(column = 0, row = 3, columnspan = 2)
+        self.imageframe.grid(column = 0, row = 3, columnspan = 3)
         # кнопки для смены списка
         self.moveup_btn = ctk.CTkButton(self, text='+', command = lambda:self.change_spriteslocation("+"))
         self.moveup_btn.grid(column = 0, row = 4)
         self.movedown_btn = ctk.CTkButton(self, text='-', command = lambda:self.change_spriteslocation("-"))
-        self.movedown_btn.grid(column = 1, row = 4)
+        self.movedown_btn.grid(column = 2, row = 4)
         # путь до спрайта
         self.spritepath = ctk.CTkLabel(self, text='')
-        self.spritepath.grid(column = 0, row = 5, columnspan = 2)
+        self.spritepath.grid(column = 0, row = 5, columnspan = 3)
         # создания ввод парамтров поиска
         self.entry = ctk.CTkEntry(master=self, width=400, height=50)
-        self.entry.grid(row=1, column=0, columnspan = 2)
+        self.entry.grid(row=1, column=0, columnspan = 3)
         self.entry.bind("<Return>", command=lambda e:(self.show_on_enter(e, 0, self.spritedelta)))
     # показ при нажатии на ентер
     def show_on_enter(self, e, startx, endx):
+        self.spriteslocation = 0
         self.pairs = get_display_sprites(self.dict["content_path"], self.entry.get()) # data = image
+        self.clear_frame(self.imageframe)
         print("pairs retrived, starting showing proccess")
         self.show_sprites(e, startx, endx)
     #  удаление виджетов в фрейме
@@ -180,15 +184,22 @@ class ChangesprPage(ctk.CTkFrame):
     # смена текста пути спрайтов
     def change_spt_path_text(self, e, path):
         self.spritepath.configure(text=path)
-    # смена спрайтов при нажатиит на кнопку
-    def change_spr(self, content_id):
-        img_file = self.get_file("change_image_to_path", [("PNG","*.png"),("JPG","*.jpg"),("JPEG","*.jpeg")])
-        if img_file != None:
-            set_db_data(self.dict["content_path"], content_id, img_file)
+    # смена или скачивание спрайтов при нажатиит на кнопку
+    def change_spr(self, content_id, compression):
+        msg = CTkMessagebox(title="", message="Download or Change?", icon="question", option_2="Download", option_1="Change")
+        response = msg.get()
+        if response == "Change":
+            self.get_file("change_image_to_path", [("PNG","*.png"),("JPG","*.jpg"),("JPEG","*.jpeg")])
+            img_file = self.dict["change_image_to_path"]
+            print(img_file)
+            if img_file != None and img_file != '':
+                set_db_data(self.dict["content_path"], content_id, img_file)
+        elif response == "Download":
+            save_current_image(self.dict["content_path"], content_id, compression)
     # Показ спрайтов
     def show_sprites(self, e, startx, endx):
         if self.dict["content_path"] == "":
-            pass
+            pass 
         else:
             imagesize = (self.contentpath_btn.cget("width"), self.contentpath_btn.cget("width"))
             pairs = self.pairs[startx:endx]
@@ -203,7 +214,7 @@ class ChangesprPage(ctk.CTkFrame):
                         pair = pairs[row*lenx + column]
                         content_id, path, data, compression = pair[0], pair[1], pair[2], pair[3]
                         image = Image.open(io.BytesIO(data)) 
-                        self.imageframe.img_btn = ctk.CTkButton(self.imageframe, image=ctk.CTkImage(light_image=image, dark_image=image, size=imagesize), text = "", fg_color='transparent', command= lambda content_id = content_id:self.change_spr(content_id))
+                        self.imageframe.img_btn = ctk.CTkButton(self.imageframe, image=ctk.CTkImage(light_image=image, dark_image=image, size=imagesize), text = "", fg_color='transparent', command= lambda content_id = content_id:self.change_spr(content_id, compression))
                         self.imageframe.img_btn.bind('<Enter>', lambda e, x=path:(self.change_spt_path_text(e, x)), add='+')
                         self.imageframe.img_btn.grid(row = row+1, column = column+1)
             pass
