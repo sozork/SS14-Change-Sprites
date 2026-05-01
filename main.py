@@ -114,25 +114,24 @@ def check_is_valid(path, data):
 def set_db_data(content_path, content_id, image_path):
     connection = sqlite3.connect(content_path)
     cursor = connection.cursor() #  UPDATE Content SET Data = data_var WHERE Id = content_id
-    compression = cursor.execute(("SELECT compression FROM Content WHERE id = "+str(content_id)))
+    compression = cursor.execute(("SELECT compression FROM Content WHERE id = ?", [str(content_id)]))
     compression = compression.fetchone()[0]
-    imagpath = cursor.execute("SELECT path FROM ContentManifest WHERE ContentId = "+str(content_id)).fetchone()[0]
+    imagpath = cursor.execute("SELECT path FROM ContentManifest WHERE ContentId = ?", [str(content_id)]).fetchone()[0]
     imagpath = imagpath.lower()
     with open(image_path, 'rb') as f:
         f = f.read()
     if compression != 0:
         f = compress_decompress.compress(f, compression)  
     size = len(f)
-    cursor.execute("UPDATE Content SET Data = ? WHERE Id = "+str(content_id), [f])
-    cursor.execute("UPDATE Content SET Size = '"+ str(size) +"' WHERE Id = "+str(content_id))
+    cursor.execute("UPDATE Content SET Data = ? WHERE Id = ?", [f, str(content_id)])
+    cursor.execute("UPDATE Content SET Size = ? WHERE Id = ?", [str(size), str(content_id)])
     connection.commit()
     connection.close()
 # сохрание по пути до спрайта
 def save_current_image(content_path, content_id, compression):
     connection = sqlite3.connect(content_path)
     cursor = connection.cursor()
-
-    data = cursor.execute("SELECT data FROM Content WHERE id="+str(content_id))
+    data = cursor.execute("SELECT data FROM Content WHERE id = ?", [str(content_id)])
     data = data.fetchone()[0]
 
     if compression != 0:
@@ -148,16 +147,16 @@ def get_display_sprites(content_path, search_param):
     connection = sqlite3.connect(content_path)
     cursor = connection.cursor()
     pairs = []
-    content_id = cursor.execute('SELECT ContentId FROM ContentManifest WHERE path LIKE "'+str(path)+'" AND path LIKE "%.png"') # Textures/_RMC14/Mobs/Xenonids/Lurker/lurker.rsi/%
+    content_id = cursor.execute('SELECT ContentId FROM ContentManifest WHERE path LIKE ? AND path LIKE "%.png"', [f'%{path}%']) # Textures/_RMC14/Mobs/Xenonids/Lurker/lurker.rsi/%
     content_id = content_id.fetchall()
     content_id = list(set(content_id))
     for i in content_id:
-        compression = cursor.execute(("SELECT compression FROM Content WHERE id = "+str(str(i[0]))))
+        compression = cursor.execute("SELECT compression FROM Content WHERE id = ?" , [str(i[0])])
         compression = compression.fetchone()[0]
         data = cursor.execute("SELECT data FROM Content WHERE id="+str(i[0]))
         data = data.fetchone()[0]
         
-        instance_path = cursor.execute("SELECT path FROM ContentManifest WHERE ContentId="+str(i[0]))
+        instance_path = cursor.execute("SELECT path FROM ContentManifest WHERE ContentId = ?", [str(i[0])])
         instance_path = instance_path.fetchall()[-1][0]
 
         if compression != 0:
@@ -272,7 +271,7 @@ class ChangesprPage(ctk.CTkFrame):
                         pair = pairs[row*lenx + column]
                         content_id, path, data, compression = pair[0], pair[1], pair[2], pair[3]
                         image = Image.open(io.BytesIO(data)) 
-                        self.imageframe.img_btn = ctk.CTkButton(self.imageframe, image=ctk.CTkImage(light_image=image, dark_image=image, size=imagesize), text = "", fg_color='transparent', command= lambda content_id = content_id, path = path:self.change_spr(content_id, path, compression))
+                        self.imageframe.img_btn = ctk.CTkButton(self.imageframe, image=ctk.CTkImage(light_image=image, dark_image=image, size=imagesize), text = "", fg_color='transparent', command= lambda content_id = content_id, path = path, compression=compression:self.change_spr(content_id, path, compression))
                         self.imageframe.img_btn.bind('<Enter>', lambda e, x=path:(self.change_spt_path_text(e, x)), add='+')
                         self.imageframe.img_btn.grid(row = row+1, column = column+1)
             pass
