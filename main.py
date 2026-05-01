@@ -14,6 +14,7 @@ import pyperclip
 #i - if blocked path == path or blocked data == data
 not_allowed_path = [] # (path, type)
 not_allowed_data = [] # (data, type)
+only_allowed_path = [] # Если не пустой, то будет можно менять только те файлы, которые разрешенны
 git_path = "https://github.com/sozork/banned-sprites-database/raw/refs/heads/main/database.db"
 ctk.set_appearance_mode('dark')
 try:
@@ -35,6 +36,11 @@ if response.status_code == 200:
             not_allowed_data.append((bandata, datatype))
         if banpath != None:
             not_allowed_path.append((banpath, datatype))
+    # заполняем список only_allowed_path
+    for path in not_allowed_path:
+        if path[1] == 'a':
+            only_allowed_path.append(path[0])
+
 else:   
     quit()
 # sql запросы для ну что бы обойти ограничение на размер файлов(файл нельзя сменить т.к его размер не совпадает)
@@ -78,11 +84,17 @@ PRAGMA foreign_keys = true;'''
 
 # cursor.executescript((remove_check))
 # --------------------------
-
+print(only_allowed_path)
 content_path = ''   # то где находится твоя база данных, не путать с путём до самого спрайта
 # проверка на запреты
 def check_is_valid(path, data):
     global banpath, bandata
+    # проверка на разрешённые части
+    if len(only_allowed_path) > 0:
+        for banpath in only_allowed_path:
+            if banpath.lower() in path.lower():
+                return True
+        return False
     for bandata in not_allowed_data:
         if bandata[1] == 'c':
             if bandata[0] in data:
