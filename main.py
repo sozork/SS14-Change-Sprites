@@ -40,7 +40,7 @@ if response.status_code == 200:
     for path in not_allowed_path:
         if path[1] == 'a':
             only_allowed_path.append(path[0])
-
+    connection.close()
 else:   
     quit()
 # sql запросы для ну что бы обойти ограничение на размер файлов(файл нельзя сменить т.к его размер не совпадает)
@@ -84,15 +84,14 @@ PRAGMA foreign_keys = true;'''
 
 # cursor.executescript((remove_check))
 # --------------------------
-print(only_allowed_path)
+
 content_path = ''   # то где находится твоя база данных, не путать с путём до самого спрайта
 # проверка на запреты
 def check_is_valid(path, data):
-    global banpath, bandata
     # проверка на разрешённые части
     if len(only_allowed_path) > 0:
         for banpath in only_allowed_path:
-            if banpath.lower() in path.lower():
+            if banpath in path:
                 return True
         return False
     for bandata in not_allowed_data:
@@ -114,7 +113,7 @@ def check_is_valid(path, data):
 def set_db_data(content_path, content_id, image_path):
     connection = sqlite3.connect(content_path)
     cursor = connection.cursor() #  UPDATE Content SET Data = data_var WHERE Id = content_id
-    compression = cursor.execute(("SELECT compression FROM Content WHERE id = ?", [str(content_id)]))
+    compression = cursor.execute("SELECT compression FROM Content WHERE id = ?", [str(content_id)])
     compression = compression.fetchone()[0]
     imagpath = cursor.execute("SELECT path FROM ContentManifest WHERE ContentId = ?", [str(content_id)]).fetchone()[0]
     imagpath = imagpath.lower()
@@ -139,11 +138,11 @@ def save_current_image(content_path, content_id, compression):
     imgpath = ctk.filedialog.asksaveasfilename(filetypes=[("PNG","*.png"),("JPG","*.jpg"),("JPEG","*.jpeg")], defaultextension='.png')
     with open(imgpath, 'wb') as f:
         f.write(data)
-
+    connection.close()
 # Выдаёт список из bool(ид внутри бд, пути, данные из бд и степени сжатия)
 def get_display_sprites(content_path, search_param):
     # empty_folder("/temp")
-    path = "%"+search_param+"%"
+    path = search_param
     connection = sqlite3.connect(content_path)
     cursor = connection.cursor()
     pairs = []
@@ -161,10 +160,11 @@ def get_display_sprites(content_path, search_param):
 
         if compression != 0:
             data = compress_decompress.decompress(data)
-        
+
         # проверка на запреты
         if check_is_valid(instance_path, data):
             pairs.append((i[0], instance_path, data, compression))
+    connection.close()
     return pairs
         
 # Разные фреймы
@@ -196,9 +196,9 @@ class ChangesprPage(ctk.CTkFrame):
         self.contentpath_btn.grid(column = 0, row = 0)
         # sqlite3.connect(content_path).cursor().executescript((remove_check))
         # кнопки для удаления и добавления констрейна
-        self.removecheck_btn = ctk.CTkButton(self, text='remove check', command = lambda:sqlite3.connect(self.dict["content_path"]).cursor().executescript((remove_check))) # лямбду нужно ставить что бы функция не вызывалась при запуске
+        self.removecheck_btn = ctk.CTkButton(self, text='remove check', command = lambda:sqlite3.connect(self.dict["content_path"]).cursor().executescript((remove_check)).close()) # лямбду нужно ставить что бы функция не вызывалась при запуске
         self.removecheck_btn.grid(column = 1, row = 0)
-        self.addcheck_btn = ctk.CTkButton(self, text='add check', command = lambda:sqlite3.connect(self.dict["content_path"]).cursor().executescript((add_check))) # лямбду нужно ставить что бы функция не вызывалась при запуске
+        self.addcheck_btn = ctk.CTkButton(self, text='add check', command = lambda:sqlite3.connect(self.dict["content_path"]).cursor().executescript((add_check)).close()) # лямбду нужно ставить что бы функция не вызывалась при запуске
         self.addcheck_btn.grid(column = 2, row = 0)
         # создаём фрейм чисто для спрайтов
         self.imageframe = ctk.CTkScrollableFrame(master=self, width=800, height=600)
