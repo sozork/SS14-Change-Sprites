@@ -1,10 +1,7 @@
 import compress_decompress, sqlite3
 from CTkMessagebox import CTkMessagebox
-import os
-import base64
 import customtkinter as ctk
 from PIL import Image
-import pandas as pd
 import requests
 import io
 import pyperclip
