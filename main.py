@@ -143,7 +143,7 @@ def get_display_sprites(content_path, search_param):
     connection = sqlite3.connect(content_path)
     cursor = connection.cursor()
     pairs = []
-    content_id = cursor.execute('SELECT ContentId FROM ContentManifest WHERE path LIKE ? AND path LIKE "%.png"', [f'%{path}%']) # Textures/_RMC14/Mobs/Xenonids/Lurker/lurker.rsi/%
+    content_id = cursor.execute('SELECT ContentId FROM ContentManifest WHERE path LIKE ? AND path LIKE "%.png"', [f'%{path}%'])
     content_id = content_id.fetchall()
     content_id = list(set(content_id))
     for i in content_id:
@@ -291,7 +291,7 @@ class App(ctk.CTk):
         self.startframe.grid(row=0, column=0) # align в центре
         # текст в углу
         self.gitlink = ctk.CTkEntry(self,fg_color="transparent", width=500, border_width=0, font=(ctk.CTkFont, 15))
-        self.gitlink.insert(0, 'https://github.com/sozork/SS14-Change-Sprites-customtkinter-rewrite')
+        self.gitlink.insert(0, 'https://github.com/sozork/SS14-Change-Sprites')
         self.gitlink.configure(state='readonly')
         self.gitlink.grid(sticky="sw")
 # запуск 
