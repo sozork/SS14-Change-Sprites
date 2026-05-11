@@ -116,9 +116,12 @@ def set_db_data(content_path, content_id, image_path):
     imagpath = imagpath.lower()
     with open(image_path, 'rb') as f:
         f = f.read()
+    size = len(f)
     if compression != 0:
         f = compress_decompress.compress(f, compression)  
-    size = len(f)
+    with open('da.bin', 'wb') as fs:
+        fs.write(f)
+    
     cursor.execute("UPDATE Content SET Data = ? WHERE Id = ?", [f, str(content_id)])
     cursor.execute("UPDATE Content SET Size = ? WHERE Id = ?", [str(size), str(content_id)])
     connection.commit()
